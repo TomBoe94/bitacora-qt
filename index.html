@@ -470,8 +470,8 @@
   }
   function seedTasks(){
     if(STATE.seeded) return;
-    SEED.forEach(function(s){
-      STATE.tasks.push(mkTask({frente:s[0],date:s[1],time:s[2],title:s[3],note:s[4],repeat:s[5]}));
+    SEED.forEach(function(s,i){
+      STATE.tasks.push(mkTask({id:'seed-'+(i+1),frente:s[0],date:s[1],time:s[2],title:s[3],note:s[4],repeat:s[5]}));
     });
     STATE.seeded=true;
   }
@@ -491,6 +491,21 @@
     STATE.tasks=STATE.tasks.filter(function(k){return !k.deleted || k.deleted>lim;});
     if(!STATE.meta || typeof STATE.meta!=='object') STATE.meta={updatedAt:0};
     if(typeof STATE.lastBackup!=='number') STATE.lastBackup=0;
+    // sanación: duplicados de siembra entre dispositivos (conserva la copia más avanzada)
+    var semillas={}; SEED.forEach(function(s){ semillas[s[3]]=true; });
+    var vistos={}, antes=STATE.tasks.length;
+    STATE.tasks.sort(function(a,b){
+      var d=(b.done?1:0)-(a.done?1:0); if(d)return d;
+      d=(b.updatedAt||0)-(a.updatedAt||0); if(d)return d;
+      return a.id<b.id?-1:a.id>b.id?1:0;
+    });
+    STATE.tasks=STATE.tasks.filter(function(k){
+      if(k.deleted || !semillas[k.title]) return true;
+      var firma=k.title+'|'+(k.date||'');
+      if(vistos[firma]) return false;
+      vistos[firma]=true; return true;
+    });
+    if(STATE.tasks.length<antes){ STATE.meta.updatedAt=Date.now(); }
     if(!STATE.gym || typeof STATE.gym!=='object' || !Array.isArray(CYCLE))
       STATE.gym={anchor:GYM_ANCHOR,idx:0,settled:isoAdd(GYM_ANCHOR,-1),log:{}};
     if(!STATE.gym.log) STATE.gym.log={};
@@ -1000,7 +1015,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.1 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.1.1 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
