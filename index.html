@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v3.1 — Centro de Mando</title>
+<title>Bitácora QT v3.2 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -416,7 +416,7 @@
   var QUAR=false;
 
   function freshState(){
-    return {v:4,checks:{},tasks:[],gym:null,legado:null,seeded:false,lastBackup:0,meta:{updatedAt:0}};
+    return {v:5,checks:{},tasks:[],gym:null,legado:null,seeded:false,lastBackup:0,meta:{updatedAt:0}};
   }
 
   // tareas iniciales: la semana real acordada el dom 12-jul
@@ -465,14 +465,12 @@
   }
   function mkTask(o){
     return {id:o.id||uid('t'),title:o.title||'',frente:o.frente||'Personal',date:o.date||'',time:o.time||'',
-      note:o.note||'',repeat:o.repeat||'',done:!!o.done,deleted:o.deleted||0,
+      note:o.note||'',repeat:o.repeat||'',done:!!o.done,doneAt:o.doneAt||0,deleted:o.deleted||0,
       createdAt:o.createdAt||Date.now(),updatedAt:o.updatedAt||Date.now()};
   }
   function seedTasks(){
-    if(STATE.seeded) return;
-    SEED.forEach(function(s,i){
-      STATE.tasks.push(mkTask({id:'seed-'+(i+1),frente:s[0],date:s[1],time:s[2],title:s[3],note:s[4],repeat:s[5]}));
-    });
+    // Las semillas de fábrica ya cumplieron su misión: los datos reales viven en GitHub.
+    // Un dispositivo nuevo parte vacío y recibe todo al conectar la sincronización.
     STATE.seeded=true;
   }
   function normalize(){
@@ -484,11 +482,15 @@
       var t=mkTask(k);
       if(FRENTE_MIGRA[t.frente]) t.frente=FRENTE_MIGRA[t.frente];
       if(!FRENTES[t.frente]) t.frente='Personal';
+      if(t.done && !t.doneAt) t.doneAt=t.updatedAt||Date.now();
       return t;
     });
     // papelera: purga suave a los 30 días
     var lim=Date.now()-30*86400000;
     STATE.tasks=STATE.tasks.filter(function(k){return !k.deleted || k.deleted>lim;});
+    // hechas: purga silenciosa a los 14 días (el registro permanente vive en Calendar)
+    var lim14=Date.now()-14*86400000;
+    STATE.tasks=STATE.tasks.filter(function(k){return !(k.done && !k.deleted && (k.doneAt||k.updatedAt||0)<lim14);});
     if(!STATE.meta || typeof STATE.meta!=='object') STATE.meta={updatedAt:0};
     if(typeof STATE.lastBackup!=='number') STATE.lastBackup=0;
     // sanación: duplicados de siembra entre dispositivos (conserva la copia más avanzada)
@@ -512,7 +514,7 @@
     if(typeof STATE.gym.idx!=='number' || STATE.gym.idx<0 || STATE.gym.idx>=CYCLE.length) STATE.gym.idx=0;
     if(!STATE.gym.anchor) STATE.gym.anchor=GYM_ANCHOR;
     if(!STATE.gym.settled) STATE.gym.settled=isoAdd(STATE.gym.anchor,-1);
-    STATE.v=4;
+    STATE.v=5;
   }
   function load(cb){
     detectStore();
@@ -572,6 +574,13 @@
       g.settled=d; changed=true;
     }
     if(changed) save(false);
+  }
+  function settleTasks(){
+    var t=today(), changed=false;
+    STATE.tasks.forEach(function(k){
+      if(!k.deleted && !k.done && k.date && k.date<t){ k.date=t; k.updatedAt=Date.now(); changed=true; }
+    });
+    if(changed) save();
   }
   function gymToday(){ var t=today(); if(t<STATE.gym.anchor) return null; return CYCLE[STATE.gym.idx]; }
   function gymProjected(dateIso){
@@ -640,14 +649,14 @@
 
   // ---------- HOY ----------
   function renderHoy(){
-    settleGym();
+    settleGym(); settleTasks();
     var now=new Date(), t=today();
     document.getElementById('todayDate').textContent=longDate(now);
     renderGym();
 
     // Planes para hoy: todo lo planificado hasta hoy (sin hora arriba, con hora abajo)
     var planes=STATE.tasks.filter(function(k){return alive(k) && !k.done && k.date && k.date<=t;});
-    var hechasHoy=STATE.tasks.filter(function(k){return alive(k) && k.done && k.date && k.date<=t;});
+    var hechasHoy=STATE.tasks.filter(function(k){return alive(k) && k.done && k.doneAt && iso(new Date(k.doneAt))===t;});
     var sinHora=planes.filter(function(k){return !k.time;})
       .sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.createdAt-b.createdAt);});
     var conHora=planes.filter(function(k){return k.time;})
@@ -699,7 +708,7 @@
   // ---------- tareas: acciones ----------
   function toggleTask(id){
     var k=taskById(id); if(!k)return;
-    k.done=!k.done; k.updatedAt=Date.now();
+    k.done=!k.done; k.updatedAt=Date.now(); k.doneAt=k.done?Date.now():0;
     if(k.done && k.repeat && k.date){
       var nd=(k.repeat==='w')?isoAdd(k.date,7):nextMonthly(k.date);
       STATE.tasks.push(mkTask({title:k.title,frente:k.frente,date:nd,time:k.time,note:k.note,repeat:k.repeat}));
@@ -712,7 +721,7 @@
 
   // ---------- SEMANA ----------
   function renderSemana(){
-    settleGym();
+    settleGym(); settleTasks();
     var base=today(), box=document.getElementById('weekBox'), h='';
     for(var n=0;n<7;n++){
       var d=addDays(base,n), key=iso(d);
@@ -742,6 +751,7 @@
   // ---------- MAESTRO ----------
   var editId=null, hechasOpen=false;
   function renderMaestro(){
+    settleTasks();
     var t=today(), box=document.getElementById('maestroBox');
     var vivas=STATE.tasks.filter(alive);
     var pend=vivas.filter(function(k){return !k.done;});
@@ -1015,7 +1025,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.1.1 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.2 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
