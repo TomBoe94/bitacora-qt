@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v3.2 — Centro de Mando</title>
+<title>Bitácora QT v3.4 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -379,22 +379,26 @@
 
   // ---------- el ritmo del amor (16 actos, solo nombre) ----------
   var BASE=[
-    ["08:00","Despertar + luz natural + movimiento","ancla"],
-    ["08:30","Orden de casa","orden"],
-    ["09:00","Entrenamiento","movimiento"],
-    ["10:30","Bloque de trabajo AM","rumbo"],
-    ["11:30","Descanso profundo","ser"],
+    ["07:22","Despertar: cortinas + agua","ancla"],
+    ["07:35","Qigong: movimiento contemplativo","ser"],
+    ["08:00","Cuerpo (60): entrenar / caminar / elongar","movimiento"],
+    ["09:00","Orden de casa","orden"],
+    ["09:30","Ducha","orden"],
+    ["10:00","Bloque profundo 1","rumbo"],
+    ["10:45","Descanso real","ser"],
+    ["11:15","Bloque profundo 2","rumbo"],
     ["12:00","Mensajería","rumbo"],
-    ["13:00","Almuerzo","ancla"],
-    ["14:00","Descanso profundo","ser"],
-    ["15:00","Bloque de trabajo PM","rumbo"],
-    ["16:15","Ocio: anime / manga / lectura / videojuegos","vida"],
-    ["17:30","Once","ancla"],
+    ["13:00","Almuerzo + creatina (13–14)","ancla"],
+    ["14:00","Marea baja","ser"],
+    ["14:30","Bloque de Nave: dragón / desborde / mantención","rumbo"],
+    ["15:30","La Pradera (PC, series, anime, té, meditar, arte, caminar, personas)","vida"],
+    ["16:00","Once (16–17)","ancla"],
+    ["17:00","Pradera II","vida"],
     ["18:00","Mensajería","rumbo"],
-    ["19:00","Ocio","vida"],
-    ["20:00","Comida","ancla"],
-    ["21:00","Lectura","descanso"],
-    ["22:00","Dormir","cierre"]
+    ["19:00","Comida (19–20)","ancla"],
+    ["20:00","Ocio con nombre","vida"],
+    ["21:30","Lectura + luces abajo","descanso"],
+    ["23:00","Dormir","cierre"]
   ];
   var IDX_TRAIN=2;
 
@@ -1025,7 +1029,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.2 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.4 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
