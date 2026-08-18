@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v3.6 — Centro de Mando</title>
+<title>Bitácora QT v3.8 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -518,6 +518,8 @@
     if(typeof STATE.gym.idx!=='number' || STATE.gym.idx<0 || STATE.gym.idx>=CYCLE.length) STATE.gym.idx=0;
     if(!STATE.gym.anchor) STATE.gym.anchor=GYM_ANCHOR;
     if(!STATE.gym.settled) STATE.gym.settled=isoAdd(STATE.gym.anchor,-1);
+    if(typeof STATE.gym.shift!=='number') STATE.gym.shift=0;
+    if(!STATE.gym.shiftAt) STATE.gym.shiftAt=0;
     STATE.v=5;
   }
   function load(cb){
@@ -567,17 +569,22 @@
 
   // ---------- ciclo de ejercicio ----------
   function settleGym(){
-    var g=STATE.gym, t=today(), changed=false;
-    while(g.settled<t){
-      var d=isoAdd(g.settled,1);
-      if(d>=t) break;
-      if(d>=g.anchor){
-        var type=CYCLE[g.idx];
-        if(type==='Descanso' || g.log[d]){ g.idx=(g.idx+1)%CYCLE.length; }
-      }
-      g.settled=d; changed=true;
+    // v3.7: jubilada. La posición del ciclo ya no se guarda ni se asienta:
+    // se CALCULA siempre desde los hechos (ancla + historial + ajuste del capitán).
+    // Dos calculadoras con los mismos hechos no pueden discrepar. Ver gymIdx().
+  }
+  // Verdad declarada por el capitán: el 17-ago-2026 es Descanso (posición 4).
+  // Desde ahí, la regla de siempre: Descanso avanza solo; Pull/Push/Pierna esperan su tick.
+  var GYM_CAL={date:'2026-08-17', idx:4};
+  function gymIdx(){
+    var g=STATE.gym, t=today(), d, idx;
+    if(t>=GYM_CAL.date){ d=GYM_CAL.date; idx=GYM_CAL.idx; }
+    else { if(t<g.anchor) return 0; d=g.anchor; idx=0; }
+    while(d<t){
+      if(CYCLE[idx]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length;
+      d=isoAdd(d,1);
     }
-    if(changed) save(false);
+    return (idx+(g.shift||0))%CYCLE.length;
   }
   function settleTasks(){
     // LEY v3.5: el corrimiento a hoy es un cálculo local y determinista.
@@ -589,14 +596,14 @@
     });
     if(changed) save(false);
   }
-  function gymToday(){ var t=today(); if(t<STATE.gym.anchor) return null; return CYCLE[STATE.gym.idx]; }
+  function gymToday(){ var t=today(); if(t<STATE.gym.anchor) return null; return CYCLE[gymIdx()]; }
   function gymProjected(dateIso){
     var g=STATE.gym, t=today();
     if(dateIso<g.anchor) return null;
     var from=(t>=g.anchor)?t:g.anchor;
     var n=Math.round((addDays(dateIso,0)-addDays(from,0))/86400000);
     if(n<0)n=0;
-    return CYCLE[(g.idx+n)%CYCLE.length];
+    return CYCLE[(gymIdx()+n)%CYCLE.length];
   }
   function renderGym(){
     var box=document.getElementById('gymChip'), g=STATE.gym, t=today();
@@ -606,7 +613,7 @@
       box.innerHTML='El ciclo de ejercicio parte '+dayName(start)+' '+shortDate(start)+': <b>'+CYCLE[0]+'</b> 💪<small>Push · Descanso · Pull · Pierna · Descanso — si un día no se hace, te espera al siguiente.</small>';
       return;
     }
-    var type=CYCLE[g.idx], next=CYCLE[(g.idx+1)%CYCLE.length];
+    var gi=gymIdx(), type=CYCLE[gi], next=CYCLE[(gi+1)%CYCLE.length];
     if(type==='Descanso'){
       box.className='gym rest'; box.onclick=null;
       box.innerHTML='🌙 Hoy: <b>Descanso</b> · se completa solo<small>Mañana: '+next+'</small>';
@@ -882,10 +889,15 @@
       });
       var gA=STATE.gym, gB=remote.gym, gymF=gA||gB;
       if(gA&&gB){
-        gymF=((gB.settled||'')>(gA.settled||''))?gB:gA;
         var lg={};
         [gA.log||{}, gB.log||{}].forEach(function(L){ Object.keys(L).forEach(function(d){ if(L[d]) lg[d]=true; }); });
-        gymF.log=lg;
+        gymF={
+          anchor:(gA.anchor<=gB.anchor)?gA.anchor:gB.anchor,
+          log:lg,
+          shift:((gB.shiftAt||0)>(gA.shiftAt||0))?(gB.shift||0):(gA.shift||0),
+          shiftAt:Math.max(gA.shiftAt||0,gB.shiftAt||0),
+          idx:0, settled:gA.settled||gB.settled||''
+        };
       }
       STATE={v:5,
         checks:chk,
@@ -1002,7 +1014,7 @@
   bind('gearBtn',function(){
     document.getElementById('expArea').value=JSON.stringify(STATE);
     document.getElementById('impArea').value='';
-    document.getElementById('cycNow').textContent=(today()<STATE.gym.anchor)?CYCLE[0]+' (por partir)':CYCLE[STATE.gym.idx];
+    document.getElementById('cycNow').textContent=(today()<STATE.gym.anchor)?CYCLE[0]+' (por partir)':CYCLE[gymIdx()];
     var lb=document.getElementById('legacyBox'), h='';
     if(STATE.legado && STATE.legado.semillero && STATE.legado.semillero.length){
       h='<div class="sec-div"></div><label>Herencia del Semillero</label>'
@@ -1015,8 +1027,8 @@
     document.getElementById('gearOverlay').classList.add('on');
   });
   bind('closeGear',function(){document.getElementById('gearOverlay').classList.remove('on');});
-  bind('cycBack',function(){var g=STATE.gym;g.idx=(g.idx+CYCLE.length-1)%CYCLE.length;save();document.getElementById('cycNow').textContent=CYCLE[g.idx];renderActive();});
-  bind('cycFwd',function(){var g=STATE.gym;g.idx=(g.idx+1)%CYCLE.length;save();document.getElementById('cycNow').textContent=CYCLE[g.idx];renderActive();});
+  bind('cycBack',function(){var g=STATE.gym;g.shift=((g.shift||0)+CYCLE.length-1)%CYCLE.length;g.shiftAt=Date.now();save();document.getElementById('cycNow').textContent=CYCLE[gymIdx()];renderActive();});
+  bind('cycFwd',function(){var g=STATE.gym;g.shift=((g.shift||0)+1)%CYCLE.length;g.shiftAt=Date.now();save();document.getElementById('cycNow').textContent=CYCLE[gymIdx()];renderActive();});
   bind('copyExp',function(){
     var ta=document.getElementById('expArea'); ta.select();
     try{navigator.clipboard.writeText(ta.value);}catch(e){try{document.execCommand('copy');}catch(e2){}}
@@ -1047,7 +1059,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.6 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.8 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
