@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v3.4 — Centro de Mando</title>
+<title>Bitácora QT v3.6 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -403,7 +403,7 @@
   var IDX_TRAIN=2;
 
   // ---------- ciclo de ejercicio rodante ----------
-  var CYCLE=['Push','Descanso','Pull','Pierna','Descanso'];
+  var CYCLE=['Pull','Descanso','Push','Pierna','Descanso'];
   var GYM_ANCHOR='2026-07-11';
 
   var FRENTES={Dinero:'#ecc08a',Salud:'#7fd1be',Casa:'#a9c8a2',Personas:'#e6a7c8',Proyecto:'#95b6e8',Personal:'#b9a6e0'};
@@ -580,11 +580,14 @@
     if(changed) save(false);
   }
   function settleTasks(){
+    // LEY v3.5: el corrimiento a hoy es un cálculo local y determinista.
+    // JAMÁS toca updatedAt ni empuja: no fabrica autoridad. Una decisión real
+    // del capitán (tick, aplazo, edición) siempre gana en la sincronización.
     var t=today(), changed=false;
     STATE.tasks.forEach(function(k){
-      if(!k.deleted && !k.done && k.date && k.date<t){ k.date=t; k.updatedAt=Date.now(); changed=true; }
+      if(!k.deleted && !k.done && k.date && k.date<t){ k.date=t; changed=true; }
     });
-    if(changed) save();
+    if(changed) save(false);
   }
   function gymToday(){ var t=today(); if(t<STATE.gym.anchor) return null; return CYCLE[STATE.gym.idx]; }
   function gymProjected(dateIso){
@@ -869,10 +872,25 @@
         if(!map[k.id] || (k.updatedAt||0)>(map[k.id].updatedAt||0)) map[k.id]=k;
       });
       var tasks=Object.keys(map).map(function(id){return map[id];});
-      STATE={v:4,
-        checks:newerDoc.checks||{},
+      // v3.6: checks y gym ya no viajan en bloque con el documento — se fusionan pieza a pieza.
+      var chk={};
+      [STATE.checks||{}, remote.checks||{}].forEach(function(src){
+        Object.keys(src||{}).forEach(function(d){
+          chk[d]=chk[d]||{};
+          Object.keys(src[d]||{}).forEach(function(i){ if(src[d][i]) chk[d][i]=true; });
+        });
+      });
+      var gA=STATE.gym, gB=remote.gym, gymF=gA||gB;
+      if(gA&&gB){
+        gymF=((gB.settled||'')>(gA.settled||''))?gB:gA;
+        var lg={};
+        [gA.log||{}, gB.log||{}].forEach(function(L){ Object.keys(L).forEach(function(d){ if(L[d]) lg[d]=true; }); });
+        gymF.log=lg;
+      }
+      STATE={v:5,
+        checks:chk,
         tasks:tasks,
-        gym:newerDoc.gym||STATE.gym,
+        gym:gymF,
         legado:newerDoc.legado||STATE.legado||remote.legado||null,
         seeded:true,
         lastBackup:Math.max(STATE.lastBackup||0,remote.lastBackup||0),
@@ -1029,7 +1047,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.4 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.6 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
