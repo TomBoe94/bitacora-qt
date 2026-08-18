@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v3.8 — Centro de Mando</title>
+<title>Bitácora QT v3.9 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -520,6 +520,15 @@
     if(!STATE.gym.settled) STATE.gym.settled=isoAdd(STATE.gym.anchor,-1);
     if(typeof STATE.gym.shift!=='number') STATE.gym.shift=0;
     if(!STATE.gym.shiftAt) STATE.gym.shiftAt=0;
+    // v3.9: los checks del ritmo viven como mapa {indice:true}; se sanan listas antiguas
+    Object.keys(STATE.checks||{}).forEach(function(d){
+      var v=STATE.checks[d];
+      if(Array.isArray(v)){
+        var o={};
+        v.forEach(function(x,ix){ if(x===true) o[ix]=true; else if(typeof x==='number') o[x]=true; });
+        STATE.checks[d]=o;
+      }
+    });
     STATE.v=5;
   }
   function load(cb){
@@ -688,11 +697,11 @@
 
     // el ritmo del amor
     var rest=(gymToday()==='Descanso');
-    var done=STATE.checks[t]||[];
+    var done=STATE.checks[t]||{};
     var tl=document.getElementById('timeline'); h='';
     for(var i=0;i<BASE.length;i++){
       if(i===IDX_TRAIN && rest) continue;
-      var isDone=done.indexOf(i)>-1;
+      var isDone=!!done[i];
       h+='<div class="stop'+(isDone?' done':'')+'" data-cat="'+BASE[i][2]+'" data-i="'+i+'">'
         +'<div class="stop-time">'+BASE[i][0]+'</div>'
         +'<div class="stop-marker"><span class="dot"></span></div>'
@@ -705,16 +714,18 @@
     updateProgress();
   }
   function toggleCheck(i,el){
-    var t=today(); if(!STATE.checks[t])STATE.checks[t]=[];
-    var arr=STATE.checks[t], p=arr.indexOf(i);
-    if(p>-1){arr.splice(p,1); el.classList.remove('done');}
-    else{arr.push(i); el.classList.add('done');}
+    var t=today(), c=STATE.checks[t];
+    if(!c){c=STATE.checks[t]={};}
+    else if(Array.isArray(c)){var o={};c.forEach(function(x,ix){if(x===true)o[ix]=true;else if(typeof x==='number')o[x]=true;});c=STATE.checks[t]=o;}
+    if(c[i]){delete c[i]; el.classList.remove('done');}
+    else{c[i]=true; el.classList.add('done');}
     save(); updateProgress();
   }
   function updateProgress(){
     var t=today(), rest=(gymToday()==='Descanso');
     var total=BASE.length-(rest?1:0);
-    var done=(STATE.checks[t]||[]).filter(function(i){return !(rest&&i===IDX_TRAIN);}).length;
+    var c=STATE.checks[t]||{};
+    var done=Object.keys(c).filter(function(k){return c[k] && !(rest&&parseInt(k,10)===IDX_TRAIN);}).length;
     document.getElementById('pbar').style.width=(total?done/total*100:0)+'%';
     document.getElementById('pcount').textContent=done+' / '+total;
   }
@@ -1059,7 +1070,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.8 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.9 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
