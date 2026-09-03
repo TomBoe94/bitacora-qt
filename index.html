@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v3.9 — Centro de Mando</title>
+<title>Bitácora QT v4.1 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -586,14 +586,17 @@
   // Desde ahí, la regla de siempre: Descanso avanza solo; Pull/Push/Pierna esperan su tick.
   var GYM_CAL={date:'2026-08-17', idx:4};
   function gymIdx(){
-    var g=STATE.gym, t=today(), d, idx;
+    // LEY v4.0: el ajuste del capitán (shift) mueve el MUNDO, no solo la etiqueta.
+    // Las decisiones de avance se toman sobre la posición EFECTIVA (la que se ve):
+    // Descanso visible se completa solo; día activo visible espera su tick. Sin abrazos mortales.
+    var g=STATE.gym, t=today(), d, idx, s=((g.shift||0)%CYCLE.length+CYCLE.length)%CYCLE.length;
     if(t>=GYM_CAL.date){ d=GYM_CAL.date; idx=GYM_CAL.idx; }
     else { if(t<g.anchor) return 0; d=g.anchor; idx=0; }
     while(d<t){
-      if(CYCLE[idx]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length;
+      if(CYCLE[(idx+s)%CYCLE.length]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length;
       d=isoAdd(d,1);
     }
-    return (idx+(g.shift||0))%CYCLE.length;
+    return (idx+s)%CYCLE.length;
   }
   function settleTasks(){
     // LEY v3.5: el corrimiento a hoy es un cálculo local y determinista.
@@ -887,7 +890,11 @@
       (STATE.tasks||[]).forEach(function(k){ if(k&&k.id)map[k.id]=k; });
       (Array.isArray(remote.tasks)?remote.tasks:[]).forEach(function(k){
         if(!k||!k.id)return;
-        if(!map[k.id] || (k.updatedAt||0)>(map[k.id].updatedAt||0)) map[k.id]=k;
+        if(!map[k.id] || (k.updatedAt||0)>(map[k.id].updatedAt||0)){ map[k.id]=k; }
+        else if((k.updatedAt||0)===(map[k.id].updatedAt||0)){
+          var a=map[k.id];
+          if((k.deleted?1:0)>(a.deleted?1:0) || (!!k.done && !a.done) || (k.doneAt||0)>(a.doneAt||0)) map[k.id]=k;
+        }
       });
       var tasks=Object.keys(map).map(function(id){return map[id];});
       // v3.6: checks y gym ya no viajan en bloque con el documento — se fusionan pieza a pieza.
@@ -959,7 +966,9 @@
       var self=this;
       var body={message:'QT sync '+new Date().toISOString(),content:this.b64enc(JSON.stringify(STATE)),branch:'main'};
       if(this.sha) body.sha=this.sha;
-      return fetch(this.url(c),{method:'PUT',headers:this.headers(c),body:JSON.stringify(body)})
+      var opts={method:'PUT',headers:this.headers(c),body:JSON.stringify(body)};
+      if(opts.body.length<60000) opts.keepalive=true; // la carta sobrevive al cierre de la pestaña
+      return fetch(this.url(c),opts)
       .then(function(r){
         if(r.status===409||r.status===422){ self.sha=null; self.busy=false; return self.now(); }
         if(r.status===401||r.status===403) throw new Error('token');
@@ -968,6 +977,7 @@
       })
       .then(function(j){
         if(j && j.content){ self.sha=j.content.sha; }
+        try{ window.localStorage.setItem('dandy-cm-lastpush', String(STATE.meta.updatedAt||0)); }catch(e){}
         self.done('Sincronizado.');
       })
       .catch(function(e){
@@ -995,6 +1005,20 @@
     SYNC.now();
   });
   bind('ghSyncNow',function(){ SYNC.now(); });
+  // v4.1: si la pestaña se esconde o cierra con una carta pendiente, el cartero sale AHORA
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden'){
+      if(SYNC.timer){ clearTimeout(SYNC.timer); SYNC.timer=null; SYNC.now(); }
+    } else if(SYNC.cfg()){ SYNC.schedule(); }
+  });
+  window.addEventListener('pagehide',function(){
+    if(SYNC.timer){ clearTimeout(SYNC.timer); SYNC.timer=null; SYNC.now(); }
+  });
+  // Revisión del bolsillo: si quedó algo sin enviar de una sesión anterior, sale al abrir
+  try{
+    var _lp=parseInt(window.localStorage.getItem('dandy-cm-lastpush')||'0',10);
+    if(SYNC.cfg() && (STATE.meta.updatedAt||0)>_lp){ SYNC.schedule(); }
+  }catch(e){}
   bind('ghForget',function(){ SYNC.setCfg(null); SYNC.sha=null; SYNC.dot(''); SYNC.status('Desconectado. Los datos siguen guardados en este dispositivo.'); });
   document.addEventListener('visibilitychange',function(){ if(!document.hidden){ settleGym(); renderActive(); SYNC.now(); } });
 
@@ -1070,7 +1094,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v3.9 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v4.1 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
