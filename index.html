@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v4.1 — Centro de Mando</title>
+<title>Bitácora QT v4.3 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -379,26 +379,28 @@
 
   // ---------- el ritmo del amor (16 actos, solo nombre) ----------
   var BASE=[
-    ["07:22","Despertar: cortinas + agua","ancla"],
-    ["07:35","Qigong: movimiento contemplativo","ser"],
-    ["08:00","Cuerpo (60): entrenar / caminar / elongar","movimiento"],
-    ["09:00","Orden de casa","orden"],
-    ["09:30","Ducha","orden"],
-    ["10:00","Bloque profundo 1","rumbo"],
-    ["10:45","Descanso real","ser"],
+    ["07:44","Despertar: cortinas + agua","ancla"],
+    ["07:55","Qigong: movimiento contemplativo","ser"],
+    ["08:15","Cuerpo (60): entrenar / caminar / elongar","movimiento"],
+    ["09:15","Orden de casa","orden"],
+    ["09:45","Ducha","orden"],
+    ["10:15","Bloque profundo 1","rumbo"],
+    ["11:00","Descanso real","ser"],
     ["11:15","Bloque profundo 2","rumbo"],
     ["12:00","Mensajería","rumbo"],
-    ["13:00","Almuerzo + creatina (13–14)","ancla"],
+    ["12:30","Cocinar (comida 1)","orden"],
+    ["13:00","Comida 1 (ventana 13–15)","ancla"],
     ["14:00","Marea baja","ser"],
     ["14:30","Bloque de Nave: dragón / desborde / mantención","rumbo"],
     ["15:30","La Pradera (PC, series, anime, té, meditar, arte, caminar, personas)","vida"],
-    ["16:00","Once (16–17)","ancla"],
+    ["16:00","Comida 2 (ventana 16–17)","ancla"],
     ["17:00","Pradera II","vida"],
     ["18:00","Mensajería","rumbo"],
-    ["19:00","Comida (19–20)","ancla"],
+    ["18:20","Cocinar (comida 3)","orden"],
+    ["19:00","Comida 3 (ventana 19–20)","ancla"],
     ["20:00","Ocio con nombre","vida"],
-    ["21:30","Lectura + luces abajo","descanso"],
-    ["23:00","Dormir","cierre"]
+    ["21:00","Lectura + luces abajo","descanso"],
+    ["22:11","Dormir","cierre"]
   ];
   var IDX_TRAIN=2;
 
@@ -520,6 +522,11 @@
     if(!STATE.gym.settled) STATE.gym.settled=isoAdd(STATE.gym.anchor,-1);
     if(typeof STATE.gym.shift!=='number') STATE.gym.shift=0;
     if(!STATE.gym.shiftAt) STATE.gym.shiftAt=0;
+    if(!STATE.gym.cal) STATE.gym.cal=null;
+    if(STATE.gym.shift && !STATE.gym.cal){
+      STATE.gym.cal={date:today(), idx:gymIdxLegacyShift(), calAt:(STATE.gym.shiftAt||Date.now())};
+      STATE.gym.shift=0;
+    }
     // v3.9: los checks del ritmo viven como mapa {indice:true}; se sanan listas antiguas
     Object.keys(STATE.checks||{}).forEach(function(d){
       var v=STATE.checks[d];
@@ -585,17 +592,29 @@
   // Verdad declarada por el capitán: el 17-ago-2026 es Descanso (posición 4).
   // Desde ahí, la regla de siempre: Descanso avanza solo; Pull/Push/Pierna esperan su tick.
   var GYM_CAL={date:'2026-08-17', idx:4};
+  // LEY v4.2: el capitán RECALIBRA DESDE HOY. Los botones ◀ ▶ fijan la posición de hoy como
+  // nuevo punto de partida (con sello). La historia anterior queda sellada; el futuro obedece
+  // la regla de siempre: Descanso avanza solo, día activo espera su tick. Predecible y monótono.
+  function gymCal(){
+    var c=STATE.gym.cal;
+    return (c && c.date && c.date>GYM_CAL.date && typeof c.idx==='number') ? c : GYM_CAL;
+  }
   function gymIdx(){
-    // LEY v4.0: el ajuste del capitán (shift) mueve el MUNDO, no solo la etiqueta.
-    // Las decisiones de avance se toman sobre la posición EFECTIVA (la que se ve):
-    // Descanso visible se completa solo; día activo visible espera su tick. Sin abrazos mortales.
-    var g=STATE.gym, t=today(), d, idx, s=((g.shift||0)%CYCLE.length+CYCLE.length)%CYCLE.length;
-    if(t>=GYM_CAL.date){ d=GYM_CAL.date; idx=GYM_CAL.idx; }
+    var g=STATE.gym, t=today(), cal=gymCal(), d, idx;
+    if(t>=cal.date){ d=cal.date; idx=cal.idx; }
+    else if(t>=GYM_CAL.date){ d=GYM_CAL.date; idx=GYM_CAL.idx; }
     else { if(t<g.anchor) return 0; d=g.anchor; idx=0; }
     while(d<t){
-      if(CYCLE[(idx+s)%CYCLE.length]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length;
+      if(CYCLE[idx]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length;
       d=isoAdd(d,1);
     }
+    return idx;
+  }
+  // Ley v4.0 conservada SOLO para migrar un ajuste antiguo (shift) a una calibración desde hoy.
+  function gymIdxLegacyShift(){
+    var g=STATE.gym, t=today(), d, idx, s=((g.shift||0)%CYCLE.length+CYCLE.length)%CYCLE.length;
+    if(t>=GYM_CAL.date){ d=GYM_CAL.date; idx=GYM_CAL.idx; } else { if(t<g.anchor) return 0; d=g.anchor; idx=0; }
+    while(d<t){ if(CYCLE[(idx+s)%CYCLE.length]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length; d=isoAdd(d,1); }
     return (idx+s)%CYCLE.length;
   }
   function settleTasks(){
@@ -739,7 +758,8 @@
     k.done=!k.done; k.updatedAt=Date.now(); k.doneAt=k.done?Date.now():0;
     if(k.done && k.repeat && k.date){
       var nd=(k.repeat==='w')?isoAdd(k.date,7):nextMonthly(k.date);
-      STATE.tasks.push(mkTask({title:k.title,frente:k.frente,date:nd,time:k.time,note:k.note,repeat:k.repeat}));
+      var yaExiste=STATE.tasks.some(function(o){ return o && !o.deleted && o.title===k.title && o.date===nd; });
+      if(!yaExiste) STATE.tasks.push(mkTask({title:k.title,frente:k.frente,date:nd,time:k.time,note:k.note,repeat:k.repeat}));
     }
     save();
   }
@@ -912,8 +932,9 @@
         gymF={
           anchor:(gA.anchor<=gB.anchor)?gA.anchor:gB.anchor,
           log:lg,
-          shift:((gB.shiftAt||0)>(gA.shiftAt||0))?(gB.shift||0):(gA.shift||0),
+          shift:0,
           shiftAt:Math.max(gA.shiftAt||0,gB.shiftAt||0),
+          cal:(((gB.cal&&gB.cal.calAt)||0)>((gA.cal&&gA.cal.calAt)||0))?(gB.cal||null):(gA.cal||null),
           idx:0, settled:gA.settled||gB.settled||''
         };
       }
@@ -1062,8 +1083,8 @@
     document.getElementById('gearOverlay').classList.add('on');
   });
   bind('closeGear',function(){document.getElementById('gearOverlay').classList.remove('on');});
-  bind('cycBack',function(){var g=STATE.gym;g.shift=((g.shift||0)+CYCLE.length-1)%CYCLE.length;g.shiftAt=Date.now();save();document.getElementById('cycNow').textContent=CYCLE[gymIdx()];renderActive();});
-  bind('cycFwd',function(){var g=STATE.gym;g.shift=((g.shift||0)+1)%CYCLE.length;g.shiftAt=Date.now();save();document.getElementById('cycNow').textContent=CYCLE[gymIdx()];renderActive();});
+  bind('cycBack',function(){var g=STATE.gym,cur=gymIdx();g.cal={date:today(),idx:(cur+CYCLE.length-1)%CYCLE.length,calAt:Date.now()};g.shift=0;save();document.getElementById('cycNow').textContent=CYCLE[gymIdx()];renderActive();});
+  bind('cycFwd',function(){var g=STATE.gym,cur=gymIdx();g.cal={date:today(),idx:(cur+1)%CYCLE.length,calAt:Date.now()};g.shift=0;save();document.getElementById('cycNow').textContent=CYCLE[gymIdx()];renderActive();});
   bind('copyExp',function(){
     var ta=document.getElementById('expArea'); ta.select();
     try{navigator.clipboard.writeText(ta.value);}catch(e){try{document.execCommand('copy');}catch(e2){}}
@@ -1094,7 +1115,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v4.1 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v4.3 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
