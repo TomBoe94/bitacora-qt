@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Bitácora QT v4.3 — Centro de Mando</title>
+<title>Bitácora QT v4.4 — Centro de Mando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -380,10 +380,10 @@
   // ---------- el ritmo del amor (16 actos, solo nombre) ----------
   var BASE=[
     ["07:44","Despertar: cortinas + agua","ancla"],
-    ["07:55","Qigong: movimiento contemplativo","ser"],
-    ["08:15","Cuerpo (60): entrenar / caminar / elongar","movimiento"],
-    ["09:15","Orden de casa","orden"],
-    ["09:45","Ducha","orden"],
+    ["07:55","QiGong, movimiento, fascia, etc. (45)","ser"],
+    ["08:40","Ejercicio físico (60)","movimiento"],
+    ["09:40","Orden de casa","orden"],
+    ["10:00","Ducha","orden"],
     ["10:15","Bloque profundo 1","rumbo"],
     ["11:00","Descanso real","ser"],
     ["11:15","Bloque profundo 2","rumbo"],
@@ -396,7 +396,7 @@
     ["16:00","Comida 2 (ventana 16–17)","ancla"],
     ["17:00","Pradera II","vida"],
     ["18:00","Mensajería","rumbo"],
-    ["18:20","Cocinar (comida 3)","orden"],
+    ["18:40","Cocinar (comida 3)","orden"],
     ["19:00","Comida 3 (ventana 19–20)","ancla"],
     ["20:00","Ocio con nombre","vida"],
     ["21:00","Lectura + luces abajo","descanso"],
@@ -610,11 +610,11 @@
     }
     return idx;
   }
-  // Ley v4.0 conservada SOLO para migrar un ajuste antiguo (shift) a una calibración desde hoy.
+  // Fórmula de la v3.9 conservada SOLO para migrar un ajuste antiguo (shift) a una calibración desde hoy.
   function gymIdxLegacyShift(){
     var g=STATE.gym, t=today(), d, idx, s=((g.shift||0)%CYCLE.length+CYCLE.length)%CYCLE.length;
     if(t>=GYM_CAL.date){ d=GYM_CAL.date; idx=GYM_CAL.idx; } else { if(t<g.anchor) return 0; d=g.anchor; idx=0; }
-    while(d<t){ if(CYCLE[(idx+s)%CYCLE.length]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length; d=isoAdd(d,1); }
+    while(d<t){ if(CYCLE[idx]==='Descanso' || g.log[d]) idx=(idx+1)%CYCLE.length; d=isoAdd(d,1); }
     return (idx+s)%CYCLE.length;
   }
   function settleTasks(){
@@ -722,12 +722,13 @@
     var done=STATE.checks[t]||{};
     var tl=document.getElementById('timeline'); h='';
     for(var i=0;i<BASE.length;i++){
-      if(i===IDX_TRAIN && rest) continue;
       var isDone=!!done[i];
+      var titulo=BASE[i][1];
+      if(i===IDX_TRAIN){ var gt=gymToday(); titulo=BASE[i][1]+(gt?' · hoy: '+(rest?'caminar / elongar':gt):''); }
       h+='<div class="stop'+(isDone?' done':'')+'" data-cat="'+BASE[i][2]+'" data-i="'+i+'">'
         +'<div class="stop-time">'+BASE[i][0]+'</div>'
         +'<div class="stop-marker"><span class="dot"></span></div>'
-        +'<div class="stop-body"><div class="stop-title"><span class="check">'+CHECK+'</span>'+esc(BASE[i][1])+'</div></div></div>';
+        +'<div class="stop-body"><div class="stop-title"><span class="check">'+CHECK+'</span>'+esc(titulo)+'</div></div></div>';
     }
     tl.innerHTML=h;
     tl.querySelectorAll('.stop').forEach(function(el){
@@ -745,9 +746,9 @@
   }
   function updateProgress(){
     var t=today(), rest=(gymToday()==='Descanso');
-    var total=BASE.length-(rest?1:0);
+    var total=BASE.length;
     var c=STATE.checks[t]||{};
-    var done=Object.keys(c).filter(function(k){return c[k] && !(rest&&parseInt(k,10)===IDX_TRAIN);}).length;
+    var done=Object.keys(c).filter(function(k){return !!c[k];}).length;
     document.getElementById('pbar').style.width=(total?done/total*100:0)+'%';
     document.getElementById('pcount').textContent=done+' / '+total;
   }
@@ -1115,7 +1116,7 @@
   });
 
   // ---------- pie ----------
-  document.getElementById('foot').textContent='QT · copiloto de vuelo — v4.3 · Amor Incondicional';
+  document.getElementById('foot').textContent='QT · copiloto de vuelo — v4.4 · Amor Incondicional';
 
   // ---------- inicio ----------
   load(function(){ renderHoy(); reflectMode(); SYNC.initUI(); SYNC.now(); });
